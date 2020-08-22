@@ -1,91 +1,122 @@
 # coding: UTF-8
-from bs4 import BeautifulSoup
-import time
-import re
-import tweepy
+
+import urllib.request
 import json
-import urllib.parse
-import requests
-import lxml.html
+import math
+import tweepy
 
-url = "https://live.worldcubeassociation.org/"
-key = "XXXXXXXXXX"
+Consumer_key = "XXXXXXXXXX"
+Consumer_secret = "XXXXXXXXXX"
+Access_token = "XXXXXXXXXX"
+Access_secret = "XXXXXXXXXX"
+auth = tweepy.OAuthHandler(Consumer_key, Consumer_secret)
+auth.set_access_token(Access_token, Access_secret)
+api = tweepy.API(auth)
 
-payload = {'url':url,'renderType':'HTML','outputAsJson':'true'}
-payload = json.dumps(payload) #JSONパース
-payload = urllib.parse.quote(payload,safe = '') #URIエンコード
- 
-phantomJSURL = "https://phantomjscloud.com/api/browser/v2/"+ key + "/?request=" + payload
+# MBLDのattemptResultを必要な値に変換
+def decodeMbldAttempt(value):
+    solved = 0
+    attempted = 0
+    centiseconds = value
+    if value <= 0:
+        return solved, attempted, centiseconds
+    missed = value % 100
+    seconds = math.floor(value / 100) % 1e5
+    points = 99 - (math.floor(value / 1e7) % 100)
+    solved = points + missed
+    attempted = solved + missed
+    centiseconds = None if seconds == 99999 else seconds * 100
+    return solved, attempted, centiseconds
 
-response = requests.get(phantomJSURL) #GETリクエスト
+# センチ秒をMBLDの記録タイムに変換
+def centisecondsToMBLDTimeFormat(value):
+    minutes = int(value / 6000)
+    seconds = int((value % 6000) / 100)
+    secondsStr = str(seconds) if seconds >= 10 else "0" + str(seconds)
+    return "%d:%s" % (minutes, secondsStr)
 
-responseDict = response.json()
-htmlAll = lxml.html.fromstring(responseDict["content"]["data"])
+# MBLD用の記録文字列にフォーマット
+def formatMbldAttempt(attempt):
+    solved, attempted, centiseconds = decodeMbldAttempt(attempt)
+    clockFormat = centisecondsToMBLDTimeFormat(centiseconds)
+    return "%d/%d %s" % (solved, attempted, clockFormat)
 
-htmlList = htmlAll.xpath("//*[@id='root']/div/div/div[.//div/ul/li[text()='Recent records']]/div/ul/div")
+# MBLDとFMC以外の競技のattemptResult(センチ秒)を記録タイムに変換
+def centisecondsToTimeFormat(value):
+    minutes = int(value / 6000)
+    minutesStr = "" if minutes == 0 else str(minutes) + ":"
+    seconds = int((value % 6000) / 100)
+    secondsStr = str(seconds) if minutes == 0 or seconds >= 10 else "0" + str(seconds)
+    centiseconds = int(value % 100)
+    centisecondsStr = str(centiseconds) if centiseconds >= 10 else "0" + str(centiseconds)
+    return "%s%s.%s" % (minutesStr, secondsStr, centisecondsStr)
 
-if len(htmlList) != 0:
-    htmlLXML = lxml.html.tostring(htmlList[0], method='html', encoding='unicode')
-    htmlBS = BeautifulSoup(htmlLXML, "html.parser")
-    html = htmlBS.select_one("div").decode_contents(formatter="html")
+# 競技ごとの記録文字列にフォーマット
+def formatAttemptResult(attemptResult, eventId, isAverage=False):
+    if eventId == "333fm":
+        return str('{:.2f}'.format(attemptResult / 100)) if isAverage else str(attemptResult)
+    if eventId == "333mbf":
+        return formatMbldAttempt(attemptResult)
+    return centisecondsToTimeFormat(attemptResult)
 
-    # WCA Liveから記録の項目を取得しファイルに書き込み
-    with open("recordList.txt", mode='w', encoding="utf-8") as f:
-        f.write(html)
+url = 'https://live.worldcubeassociation.org/api'
+req_header = {
+    'Content-Type': 'application/json',
+}
+req_data = '{ "query": "{ recentRecords { competition { id name } event { name } round { id } type recordTag attemptResult result { person { name country { name } } } } }" }'
 
-    # ファイルから読み出し
-    htmlOriginal = ""
-    with open('recordList.txt', 'r', encoding="utf-8") as f:
-        htmlOriginal += f.read()
+# WCA LiveのGraqlQL APIでRecent RecordsをJSON形式で取得
+req = urllib.request.Request(url, data=req_data.encode(), method='POST', headers=req_header)
 
-    beforeHTMLOriginal = ""
-    with open('beforeRecordList.txt', 'r', encoding="utf-8") as f:
-        beforeHTMLOriginal += f.read()
+# String型のJSON dataを辞書型に変換
+recordList = {}
+with urllib.request.urlopen(req) as response:
+    recordList = json.loads(response.read())
 
-    # HTMLにパース
-    html = BeautifulSoup(htmlOriginal, "html.parser")
-    html = html.select("a")
-    beforeHTML = BeautifulSoup(beforeHTMLOriginal, "html.parser")
-    beforeHTML = beforeHTML.select("a")
+if len(recordList['data']['recentRecords']) != 0:
+    # 前回取得した記録リストを読み込み
+    beforeRecordListString = ""
+    # with open('beforeRecordList.txt', 'r', encoding="utf-8") as f:
+    with open('/home/shuto/WCALivebot/beforeRecordList.txt', 'r', encoding="utf-8") as f:
+        beforeRecordListString += f.read()
+    beforeRecordList = json.loads(beforeRecordListString)
 
-    # 追加差分を取得
+    # 前回との差分を取得
     difference = []
-    for item in html:
+    for item in recordList['data']['recentRecords']:
         noneFlag = True
-        for beforeItem in beforeHTML:
-            if item.select_one("div:nth-child(1) > span").text == beforeItem.select_one("div:nth-child(1) > span").text and item.select_one("div:nth-child(2) > span").text == beforeItem.select_one("div:nth-child(2) > span").text and item.select_one("div:nth-child(2) > p").text == beforeItem.select_one("div:nth-child(2) > p").text:
+        for beforeItem in beforeRecordList['data']['recentRecords']:
+            if item['competition']['id'] == beforeItem['competition']['id'] \
+                and item['event']['name'] == beforeItem['event']['name'] \
+                and item['round']['id'] == beforeItem['round']['id'] \
+                and item['type'] == beforeItem['type'] \
+                and item['recordTag'] == beforeItem['recordTag'] \
+                and item['attemptResult'] == beforeItem['attemptResult'] \
+                and item['result']['person']['name'] == beforeItem['result']['person']['name']:
                 noneFlag = False
                 break
         if noneFlag:
             difference.append(item)
-
-    Consumer_key = "XXXXXXXXXX"
-    Consumer_secret = "XXXXXXXXXX"
-    Access_token = "XXXXXXXXXX"
-    Access_secret = "XXXXXXXXXX"
-    auth = tweepy.OAuthHandler(Consumer_key, Consumer_secret)
-    auth.set_access_token(Access_token, Access_secret)
-    api = tweepy.API(auth)
-
+    
     # 更新情報を整形してツイート
     if len(difference) != 0:
         for record in difference:
-            recordType = record.select_one("div:nth-child(1) > span").text
-            recordInfoList = record.select_one("div:nth-child(2) > span").text.split(" of ")
-            recordInfo = recordInfoList[0] + " " + recordType + " (" + recordInfoList[1] + ")"
-            recordPersonList = record.select_one("div:nth-child(2) > p").text.split(" from ")
-            recordPerson = recordPersonList[0] + " (from " + recordPersonList[1] + ")" 
+            person = record['result']['person']['name']
+            country = record['result']['person']['country']['name']
+            event = record['event']['name']
+            recordType = record['type']
+            recordTag = record['recordTag']
+            result = centisecondsToTimeFormat(record['attemptResult'])
+            competition = record['competition']['name']
+            url = "/competitions/" + record['competition']['id'] + "/rounds/" + record['round']['id']
 
-            recordURL = record["href"]
-            recordURLList = recordURL.split("/")
-            recordCompetitionName = requests.get("https://www.worldcubeassociation.org/api/v0/competitions/" + recordURLList[2] + "/")
-            recordCompetitionName = recordCompetitionName.json()
-            recordCompetitionName = recordCompetitionName["name"]
-
-            tweetSentence = recordPerson + " just got the " + recordInfo + " at " + recordCompetitionName + " https://live.worldcubeassociation.org" + recordURL
+            tweetSentence = person + " (from " + country + ") just got the " + event + " " + recordType + " " \
+                + recordTag + " (" + result + ") at " + competition + " https://live.worldcubeassociation.org" + url
             # print(tweetSentence)
             api.update_status(tweetSentence)
 
         # 現在の情報をファイルに書き込み
-        with open("beforeRecordList.txt", mode='w', encoding="utf-8") as f:
-            f.write(htmlOriginal)
+        # with open("beforeRecordList.txt", mode='w', encoding="utf-8") as f:
+        with open("/home/shuto/WCALivebot/beforeRecordList.txt", mode='w', encoding="utf-8") as f:
+            f.write(json.dumps(recordList))
+
