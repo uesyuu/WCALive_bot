@@ -63,7 +63,7 @@ url = 'https://live.worldcubeassociation.org/api'
 req_header = {
     'Content-Type': 'application/json',
 }
-req_data = '{ "query": "{ recentRecords { competition { id name } event { name } round { id } type recordTag attemptResult result { person { name country { name } } } } }" }'
+req_data = '{ "query": "{ recentRecords { competition { id name } event { id name } round { id } type recordTag attemptResult result { person { name country { name } } } } }" }'
 
 # WCA LiveのGraqlQL APIでRecent RecordsをJSON形式で取得
 req = urllib.request.Request(url, data=req_data.encode(), method='POST', headers=req_header)
@@ -106,7 +106,8 @@ if len(recordList['data']['recentRecords']) != 0:
             event = record['event']['name']
             recordType = record['type']
             recordTag = record['recordTag']
-            result = centisecondsToTimeFormat(record['attemptResult'])
+            isAverage = True if record['type'] == "average" else False
+            result = formatAttemptResult(record['attemptResult'], record['event']['id'], isAverage)
             competition = record['competition']['name']
             url = "/competitions/" + record['competition']['id'] + "/rounds/" + record['round']['id']
 
