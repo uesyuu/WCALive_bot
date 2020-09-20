@@ -63,7 +63,8 @@ url = 'https://live.worldcubeassociation.org/api'
 req_header = {
     'Content-Type': 'application/json',
 }
-req_data = '{ "query": "{ recentRecords { competition { id name } event { id name } round { id } type recordTag attemptResult result { person { name country { name } } } } }" }'
+
+req_data = '{ "query": "{ recentRecords { type tag attemptResult result { person { name country { name } } round { id competitionEvent { event { id name } competition { id name } } } } } }" }'
 
 # WCA LiveのGraqlQL APIでRecent RecordsをJSON形式で取得
 req = urllib.request.Request(url, data=req_data.encode(), method='POST', headers=req_header)
@@ -86,11 +87,10 @@ if len(recordList['data']['recentRecords']) != 0:
     for item in recordList['data']['recentRecords']:
         noneFlag = True
         for beforeItem in beforeRecordList['data']['recentRecords']:
-            if item['competition']['id'] == beforeItem['competition']['id'] \
-                and item['event']['name'] == beforeItem['event']['name'] \
-                and item['round']['id'] == beforeItem['round']['id'] \
+            if item['result']['round']['competitionEvent']['competition']['id'] == beforeItem['result']['round']['competitionEvent']['competition']['id'] \
+                and item['result']['round']['competitionEvent']['event']['name'] == beforeItem['result']['round']['competitionEvent']['event']['name'] \
                 and item['type'] == beforeItem['type'] \
-                and item['recordTag'] == beforeItem['recordTag'] \
+                and item['tag'] == beforeItem['tag'] \
                 and item['attemptResult'] == beforeItem['attemptResult'] \
                 and item['result']['person']['name'] == beforeItem['result']['person']['name']:
                 noneFlag = False
@@ -103,13 +103,13 @@ if len(recordList['data']['recentRecords']) != 0:
         for record in difference:
             person = record['result']['person']['name']
             country = record['result']['person']['country']['name']
-            event = record['event']['name']
+            event = record['result']['round']['competitionEvent']['event']['name']
             recordType = record['type']
-            recordTag = record['recordTag']
+            recordTag = record['tag']
             isAverage = True if record['type'] == "average" else False
-            result = formatAttemptResult(record['attemptResult'], record['event']['id'], isAverage)
-            competition = record['competition']['name']
-            url = "/competitions/" + record['competition']['id'] + "/rounds/" + record['round']['id']
+            result = formatAttemptResult(record['attemptResult'], record['result']['round']['competitionEvent']['event']['id'], isAverage)
+            competition = record['result']['round']['competitionEvent']['competition']['name']
+            url = "/competitions/" + record['result']['round']['competitionEvent']['competition']['id'] + "/rounds/" + record['result']['round']['id']
 
             tweetSentence = person + " (from " + country + ") just got the " + event + " " + recordType + " " \
                 + recordTag + " (" + result + ") at " + competition + " https://live.worldcubeassociation.org" + url
