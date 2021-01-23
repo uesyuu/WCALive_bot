@@ -80,18 +80,16 @@ with urllib.request.urlopen(req) as response:
 if len(recordList['data']['recentRecords']) != 0:
     conn = psycopg2.connect(DATABASE_URL, sslmode='require')
 
+    # 前回取得した記録リストを読み込み
     cur = conn.cursor()
     cur.execute("SELECT data FROM record_list;")
     raw_data = cur.fetchone()
-    print(raw_data)
     beforeRecordListString = raw_data[0]
-
-    # 前回取得した記録リストを読み込み
-    # beforeRecordListString = ""
-    # with open('beforeRecordList.txt', 'r', encoding="utf-8") as f:
-    # # with open('/home/shuto/WCALivebot/beforeRecordList.txt', 'r', encoding="utf-8") as f:
-    #     beforeRecordListString += f.read()
     beforeRecordList = json.loads(beforeRecordListString)
+
+    # DBのデータを一旦削除
+    cur.execute("DELETE FROM record_list;")
+    conn.commit()
 
     # 前回との差分を取得
     difference = []
@@ -127,10 +125,9 @@ if len(recordList['data']['recentRecords']) != 0:
             print(tweetSentence)
             # api.update_status("(This is test tweet) " + tweetSentence)
 
-        # 現在の情報をファイルに書き込み
-        # with open("beforeRecordList.txt", mode='w', encoding="utf-8") as f:
-        # # with open("/home/shuto/WCALivebot/beforeRecordList.txt", mode='w', encoding="utf-8") as f:
-        #     f.write(json.dumps(recordList))
+        # 現在の情報をDBに書き込み
+        cur.execute("INSERT INTO record_list VALUES (%s);", json.dumps(recordList))
+        conn.commit()
     
     cur.close()
     conn.close()
