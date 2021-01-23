@@ -126,7 +126,7 @@ if len(recordList['data']['recentRecords']) != 0:
             # api.update_status("(This is test tweet) " + tweetSentence)
 
         # 現在の情報をDBに書き込み
-        cur.execute("INSERT INTO record_list VALUES (%s);", json.dumps(recordList))
+        cur.execute("INSERT INTO record_list VALUES (%s);", (json.dumps(recordList),))
         conn.commit()
     
     cur.close()
