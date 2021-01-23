@@ -82,7 +82,7 @@ if len(recordList['data']['recentRecords']) != 0:
 
     cur = conn.cursor()
     cur.execute("SELECT data FROM record_list;")
-    beforeRecordListString = cur.fetchone()
+    beforeRecordListString = (cur.fetchone())[1]
 
     # 前回取得した記録リストを読み込み
     # beforeRecordListString = ""
