@@ -122,8 +122,8 @@ if len(recordList['data']['recentRecords']) != 0:
 
             tweetSentence = person + " (from " + country + ") just got the " + event + " " + recordType + " " \
                 + recordTag + " (" + result + ") at " + competition + " https://live.worldcubeassociation.org" + url
-            print(tweetSentence)
-            # api.update_status("(This is test tweet) " + tweetSentence)
+            # print(tweetSentence)
+            api.update_status(tweetSentence)
 
         # 現在の情報をDBに書き込み
         cur.execute("INSERT INTO record_list VALUES (%s);", (json.dumps(recordList),))
