@@ -84,7 +84,7 @@ if len(recordList['data']['recentRecords']) != 0:
     cur.execute("SELECT data FROM record_list;")
     raw_data = cur.fetchone()
     print(raw_data)
-    (beforeRecordListString) = raw_data
+    beforeRecordListString = raw_data[0]
 
     # 前回取得した記録リストを読み込み
     # beforeRecordListString = ""
