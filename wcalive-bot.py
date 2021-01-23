@@ -1,14 +1,15 @@
 # coding: UTF-8
 
+import os
 import urllib.request
 import json
 import math
 import tweepy
 
-Consumer_key = "XXXXXXXXXX"
-Consumer_secret = "XXXXXXXXXX"
-Access_token = "XXXXXXXXXX"
-Access_secret = "XXXXXXXXXX"
+Consumer_key = os.environ["CONSUMER_KEY"]
+Consumer_secret = os.environ["CONSUMER_SECRET"]
+Access_token = os.environ["ACCESS_TOKEN_KEY"]
+Access_secret = os.environ["ACCESS_TOKEN_SECRET"]
 auth = tweepy.OAuthHandler(Consumer_key, Consumer_secret)
 auth.set_access_token(Access_token, Access_secret)
 api = tweepy.API(auth)
@@ -77,8 +78,8 @@ with urllib.request.urlopen(req) as response:
 if len(recordList['data']['recentRecords']) != 0:
     # 前回取得した記録リストを読み込み
     beforeRecordListString = ""
-    # with open('beforeRecordList.txt', 'r', encoding="utf-8") as f:
-    with open('/home/shuto/WCALivebot/beforeRecordList.txt', 'r', encoding="utf-8") as f:
+    with open('beforeRecordList.txt', 'r', encoding="utf-8") as f:
+    # with open('/home/shuto/WCALivebot/beforeRecordList.txt', 'r', encoding="utf-8") as f:
         beforeRecordListString += f.read()
     beforeRecordList = json.loads(beforeRecordListString)
 
@@ -114,10 +115,10 @@ if len(recordList['data']['recentRecords']) != 0:
             tweetSentence = person + " (from " + country + ") just got the " + event + " " + recordType + " " \
                 + recordTag + " (" + result + ") at " + competition + " https://live.worldcubeassociation.org" + url
             # print(tweetSentence)
-            api.update_status(tweetSentence)
+            api.update_status("(This is test tweet) " + tweetSentence)
 
         # 現在の情報をファイルに書き込み
-        # with open("beforeRecordList.txt", mode='w', encoding="utf-8") as f:
-        with open("/home/shuto/WCALivebot/beforeRecordList.txt", mode='w', encoding="utf-8") as f:
+        with open("beforeRecordList.txt", mode='w', encoding="utf-8") as f:
+        # with open("/home/shuto/WCALivebot/beforeRecordList.txt", mode='w', encoding="utf-8") as f:
             f.write(json.dumps(recordList))
 
