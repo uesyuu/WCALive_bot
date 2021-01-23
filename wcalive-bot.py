@@ -5,11 +5,13 @@ import urllib.request
 import json
 import math
 import tweepy
+import psycopg2
 
 Consumer_key = os.environ["CONSUMER_KEY"]
 Consumer_secret = os.environ["CONSUMER_SECRET"]
 Access_token = os.environ["ACCESS_TOKEN_KEY"]
 Access_secret = os.environ["ACCESS_TOKEN_SECRET"]
+DATABASE_URL = os.environ['DATABASE_URL']
 auth = tweepy.OAuthHandler(Consumer_key, Consumer_secret)
 auth.set_access_token(Access_token, Access_secret)
 api = tweepy.API(auth)
@@ -76,11 +78,17 @@ with urllib.request.urlopen(req) as response:
     recordList = json.loads(response.read())
 
 if len(recordList['data']['recentRecords']) != 0:
+    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+
+    cur = conn.cursor()
+    cur.execute("SELECT data FROM record_list;")
+    beforeRecordListString = cur.fetchone()
+
     # 前回取得した記録リストを読み込み
-    beforeRecordListString = ""
-    with open('beforeRecordList.txt', 'r', encoding="utf-8") as f:
-    # with open('/home/shuto/WCALivebot/beforeRecordList.txt', 'r', encoding="utf-8") as f:
-        beforeRecordListString += f.read()
+    # beforeRecordListString = ""
+    # with open('beforeRecordList.txt', 'r', encoding="utf-8") as f:
+    # # with open('/home/shuto/WCALivebot/beforeRecordList.txt', 'r', encoding="utf-8") as f:
+    #     beforeRecordListString += f.read()
     beforeRecordList = json.loads(beforeRecordListString)
 
     # 前回との差分を取得
@@ -114,11 +122,14 @@ if len(recordList['data']['recentRecords']) != 0:
 
             tweetSentence = person + " (from " + country + ") just got the " + event + " " + recordType + " " \
                 + recordTag + " (" + result + ") at " + competition + " https://live.worldcubeassociation.org" + url
-            # print(tweetSentence)
-            api.update_status("(This is test tweet) " + tweetSentence)
+            print(tweetSentence)
+            # api.update_status("(This is test tweet) " + tweetSentence)
 
         # 現在の情報をファイルに書き込み
-        with open("beforeRecordList.txt", mode='w', encoding="utf-8") as f:
-        # with open("/home/shuto/WCALivebot/beforeRecordList.txt", mode='w', encoding="utf-8") as f:
-            f.write(json.dumps(recordList))
+        # with open("beforeRecordList.txt", mode='w', encoding="utf-8") as f:
+        # # with open("/home/shuto/WCALivebot/beforeRecordList.txt", mode='w', encoding="utf-8") as f:
+        #     f.write(json.dumps(recordList))
+    
+    cur.close()
+    conn.close()
 
