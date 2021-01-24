@@ -87,10 +87,6 @@ if len(recordList['data']['recentRecords']) != 0:
     beforeRecordListString = raw_data[0]
     beforeRecordList = json.loads(beforeRecordListString)
 
-    # DBのデータを一旦削除
-    cur.execute("DELETE FROM record_list;")
-    conn.commit()
-
     # 前回との差分を取得
     difference = []
     for item in recordList['data']['recentRecords']:
@@ -123,7 +119,11 @@ if len(recordList['data']['recentRecords']) != 0:
             tweetSentence = person + " (from " + country + ") just got the " + event + " " + recordType + " " \
                 + recordTag + " (" + result + ") at " + competition + " https://live.worldcubeassociation.org" + url
             # print(tweetSentence)
-            api.update_status("(This is test tweet)" + tweetSentence)
+            api.update_status(tweetSentence)
+        
+        # DBのデータを一旦削除
+        cur.execute("DELETE FROM record_list;")
+        conn.commit()
 
         # 現在の情報をDBに書き込み
         cur.execute("INSERT INTO record_list VALUES (%s);", (json.dumps(recordList),))
